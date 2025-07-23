@@ -38,7 +38,6 @@ const RegistrationForm = () => {
       showToast("Please enter your email.", "error");
       return;
     }
-    // Simulated API call for demo
     console.log("Form submitted:", formData);
     showToast("Registration successful! Welcome aboard!", "success");
   };
