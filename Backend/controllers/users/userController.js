@@ -2,6 +2,7 @@ const asyncHandler = require("express-async-handler");
 const User = require("../../models/entities/userModel");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
+const { constants } = require("../../constants/constants");
 require("dotenv").config();
 
 // Registration User
@@ -12,7 +13,7 @@ const registerUser = asyncHandler(async (req, res) => {
 
   // Check for missing fields
   if (!name || !username || !email || !password) {
-    res.status(400);
+    res.status(constants.VALIDATION_ERROR);
     throw new Error("All fields are required");
   }
 
@@ -24,7 +25,7 @@ const registerUser = asyncHandler(async (req, res) => {
   });
 
   if (userAlreadywithUsername) {
-    res.status(409);
+    res.status(constants.CONFLICT);
     throw new Error("User already exists with username");
   }
 
@@ -35,7 +36,7 @@ const registerUser = asyncHandler(async (req, res) => {
   });
 
   if (userAlreadyExistswithEmail) {
-    res.status(409);
+    res.status(constants.CONFLICT);
     throw new Error("User already exists with email");
   }
 
@@ -72,7 +73,7 @@ const registerUser = asyncHandler(async (req, res) => {
     newUser.refreshToken = refreshToken;
     await newUser.save();
 
-    res.status(201).json({
+    res.status(constants.CREATED).json({
       message: "User registred and logged in successfully",
       id: newUser.id,
       username: newUser.username,
@@ -82,7 +83,7 @@ const registerUser = asyncHandler(async (req, res) => {
       refreshToken,
     });
   } else {
-    res.status(500);
+    res.status(constants.SERVER_ERROR);
     throw new Error("Server Error");
   }
 });
@@ -95,7 +96,7 @@ function isEmail(input) {
 const loginUser = asyncHandler(async (req, res) => {
   const { identifier, password } = req.body;
   if (!identifier || !password) {
-    res.status(400);
+    res.status(constants.VALIDATION_ERROR);
     throw new Error("username or email and password are required.");
   }
   let user;
@@ -135,7 +136,7 @@ const loginUser = asyncHandler(async (req, res) => {
 
     await user.save();
 
-    res.status(200).json({
+    res.status(constants.OK).json({
       message: "Logged In Successfully",
       id: user.id,
       username: user.username,
@@ -145,9 +146,98 @@ const loginUser = asyncHandler(async (req, res) => {
       refreshToken,
     });
   } else {
-    res.status(401);
+    res.status(constants.UNAUTHORIZED);
     throw new Error("Invalid identifier or password.");
   }
 });
 
-module.exports = { registerUser, loginUser };
+const refreshAccessToken = asyncHandler(async (req, res) => {
+  const { refreshToken } = req.body;
+  if (!refreshToken) {
+    res.status(constants.UNAUTHORIZED);
+    throw new Error("Refresh Token not provided in request body");
+  }
+
+  try {
+    const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
+
+    const user = await User.findOne({
+      where: {
+        id: decoded.id,
+        refreshToken: refreshToken,
+      },
+    });
+
+    if (!user) {
+      res.status(constants.FORBIDDEN);
+      throw new Error("Invalid or revoked refresh token");
+    }
+
+    const newAccessToken = jwt.sign(
+      {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+      },
+      process.env.ACCESS_TOKEN_SECRET,
+      { expiresIn: "15m" }
+    );
+    const newRefreshToken = jwt.sign(
+      { id: user.id },
+      process.env.REFRESH_TOKEN_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    user.refreshToken = newRefreshToken;
+    await user.save();
+
+    res.status(constants.OK).json({
+      message: "Tokens refreshed successfully",
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+    });
+  } catch (err) {
+    if (err.name === "TokenExpiredError") {
+      res.status(constants.UNAUTHORIZED);
+      throw new Error("Refresh Token Expired! Please login again");
+    } else if (err.name === "JsonWebTokenError") {
+      res.status(constants.FORBIDDEN);
+      throw new Error("Invalid refresh token signature");
+    } else {
+      res.status(constants.SERVER_ERROR);
+      throw new Error("Failed to refresh token : ", err.message);
+    }
+  }
+});
+
+const logoutUser = asyncHandler(async (req, res) => {
+  const userId = req.user?.id;
+
+  if (!userId) {
+    res.status(constants.UNAUTHORIZED);
+    throw new Error("User not authenticated for logout.");
+  }
+
+  try {
+    const user = await User.findByPk(userId);
+
+    console.log("Found user")
+
+    if (!user) {
+      res.status(constants.NOT_FOUND);
+      throw new Error("User not found");
+    }
+
+    user.refreshToken = null;
+
+    await user.save();
+
+    res.status(constants.OK).json({
+      message: "User logged out successfully",
+    });
+  } catch (err) {
+    res.status(constants.SERVER_ERROR);
+    throw new Error("Failed to logout: " + err.message);
+  }
+});
+module.exports = { registerUser, loginUser, refreshAccessToken, logoutUser };
