@@ -114,7 +114,7 @@ const loginUser = asyncHandler(async (req, res) => {
     });
   }
 
-  if (user && bcrypt.compare(password, user.password)) {
+  if (user && (await bcrypt.compare(password, user.password))) {
     const accessToken = jwt.sign(
       {
         id: user.id,
@@ -220,8 +220,6 @@ const logoutUser = asyncHandler(async (req, res) => {
 
   try {
     const user = await User.findByPk(userId);
-
-    console.log("Found user")
 
     if (!user) {
       res.status(constants.NOT_FOUND);

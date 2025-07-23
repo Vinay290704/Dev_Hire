@@ -1,13 +1,17 @@
-import  { useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useState, useContext } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
+import { AuthContext } from "../../context/Authentication/AuthContext"; 
 
 const LoginForm = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
-    email: "",
+    identifier: "",
     password: "",
   });
+
+  const { login, loading, message, error } = useContext(AuthContext);
+  const navigate = useNavigate();
 
   const handleChange = (e) => {
     setFormData((prev) => ({
@@ -16,13 +20,21 @@ const LoginForm = () => {
     }));
   };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const result = await login(formData.identifier, formData.password);
+    if (result.success) {
+      navigate("/home");
+    }
+  };
+
   return (
-    <div className="h-[100vh]  items-center flex justify-center px-5 lg:px-0">
+    <div className="h-[100vh] items-center flex justify-center px-5 lg:px-0">
       <div className="max-w-screen-xl bg-white shadow-xs shadow-[#00BDA6] sm:rounded-lg flex justify-center flex-1">
         <div className="hidden md:block md:w-1/2 lg:w-1/2 xl:w-7/12">
           <div></div>
           <div
-            className="h-full w-full bg-cover  rounded-2xl"
+            className="h-full w-full bg-cover rounded-2xl"
             style={{
               backgroundImage:
                 "url(https://static.vecteezy.com/system/resources/previews/008/415/006/non_2x/employment-agency-for-recruitment-or-placement-job-service-with-skilled-and-experienced-career-laborers-in-flat-cartoon-illustration-vector.jpg)",
@@ -42,14 +54,19 @@ const LoginForm = () => {
             </div>
 
             <div className="w-full flex-1 mt-8">
-              <form className="mx-auto max-w-xs flex flex-col gap-4">
+              <form
+                className="mx-auto max-w-xs flex flex-col gap-4"
+                onSubmit={handleSubmit}
+              >
+                {" "}
+
                 <input
-                  name="email"
-                  value={formData.email}
+                  name="identifier"
+                  value={formData.identifier}
                   onChange={handleChange}
                   className="w-full px-5 py-3 rounded-lg font-medium bg-gray-100 border border-gray-200 placeholder-gray-500 text-sm focus:outline-none focus:border-gray-400 focus:bg-white"
-                  type="email"
-                  placeholder="Enter registered email-id"
+                  type="text" 
+                  placeholder="Enter registered email or username"
                   required
                 />
                 <div className="relative w-full">
@@ -73,10 +90,10 @@ const LoginForm = () => {
                     )}
                   </div>
                 </div>
-
                 <button
                   type="submit"
                   className="mt-5 tracking-wide font-semibold bg-[#FF6D34] text-gray-100 w-full py-4 rounded-lg hover:bg-[#00BDA6] transition-all duration-100 ease-in-out flex items-center justify-center focus:shadow-outline focus:outline-none"
+                  disabled={loading}
                 >
                   <svg
                     className="w-6 h-6 -ml-2"
@@ -92,11 +109,11 @@ const LoginForm = () => {
                   </svg>
                   <span className="ml-3">Login</span>
                 </button>
-
                 <p className=" text-l text-gray-600 text-center">
                   Don't have an account?{" "}
-                  <Link to="/">
-                    <span className="text-[#00BDA6]  hover:text-[#FF6D34] font-semibold">
+                  <Link to="/register">
+                    {" "}
+                    <span className="text-[#00BDA6] hover:text-[#FF6D34] font-semibold">
                       Sign up
                     </span>
                   </Link>
